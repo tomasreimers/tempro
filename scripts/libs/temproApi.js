@@ -1,7 +1,7 @@
 var $ = require('jquery');
 var testing = require('../tests/testData');
 
-var apiBase = testing.testUrl; //'http://api.tempro.xyz/v1';
+var apiBase = 'http://api.tempro.xyz/v1';
 
 // TODO [Tomas, 11-9-2015]: Automatically create this (path dot method name)
 
