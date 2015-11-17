@@ -13,42 +13,55 @@ module.exports = React.createClass({
   getInitialState: function () {
     return {
       loadedData: false,
-      data: {}
+      apiSuccess: false,
+      data: {},
+      query: {},
+      confirmation_message: ''
     }
   },
 
   handleSubmit: function (event) {
 
-    // TODO [Joe, 11-13-2015] : Share data more elegantly
-    let { query } = this.props.location;
+    var _this = this;
 
     let comment = $('#additional-feedback').val();
 
     event.preventDefault();
     temproApi.vote.put({
-      token: query.token,
-      email: query.email,
-      ceid: query.ceid,
+      token: this.state.query.token,
+      email: this.state.query.email,
+      ceid: this.state.query.ceid,
       vote: this.state.data.vote,
       comment: comment
     }).done(function(data) {
 
-      console.log('Updates Confirmed: ', data);
+      _this.setState({
+        confirmation_message: 'Your vote has been cast! Thanks for submitting the form.'
+      });
+
     }).fail(function(error) {
 
-      console.log('Could not update vote or comment: ', error);
+      _this.setState({
+        confirmation_message: 'Something went wrong. Could you try submitting the form again?'
+      });
+
     });
   },
 
   componentDidMount: function () {
 
-    // Avoid closure problems later on.
     var _this = this;
 
+
+    // Get query params and share with rest of component
     let { query } = this.props.location;
 
+    _this.setState({
+      query: query
+    });
+
     if (query && query.token && query.email && query.ceid) {
-      // TODO [Tomas, 11-9-2015] : Make sure two queries doesn't lead to race conditions
+      // TODO [Tomas, 11-9-2015] : BUG FIX : Make sure two queries doesn't lead to race conditions
 
       // Immediately submit vote if possible
       if (!_.isUndefined(query.vote)) {
@@ -59,13 +72,29 @@ module.exports = React.createClass({
           vote: query.vote
         }).done(function(data) {
 
-          // TODO [Joe, 11-13-2015] : Only at this point should user see confirmation that vote was sent from image URL
-          console.log('Voted!', data)
+          // If vote retrieved from URL, and submitted successfully, notify user.
+          _this.setState({
+            confirmation_message: 'Your vote has been submitted!'
+          });
+
         }).fail(function(error) {
 
-          // TODO [Joe, 11-13-2015] : Handle Error, suggest that user resubmits through form
-          console.log('Vote Fail:', error);
+          // Vote val present in URL params, but put request failed, notify user
+          _this.setState({
+            confirmation_message: 'Something went wrong. Please revote by submitting the form below!'
+          });
+
         });
+      } else {
+
+        if (_this.state.data.vote < 1 || _this.state.data.vote > 3) {
+
+          // If vote not present in URL params, AND not already set in state, notify user.
+          _this.setState({
+            confirmation_message: 'We weren\'t able to retrieve your vote. Please submit the form below.'
+          });
+        }
+
       }
 
       // Get data to populate component
@@ -74,8 +103,6 @@ module.exports = React.createClass({
         email: query.email,
         ceid: query.ceid
       }).done(function(data) {
-
-        console.log('Request Successful: ', data);
 
         _this.setState({
           data: data,
@@ -98,19 +125,20 @@ module.exports = React.createClass({
 
       }).fail(function(error) {
 
-        // TODO [Joe, 11-13-2015] : Handle Errors
-        console.log('API Call Failure', error);
+        _this.setState({
+          confirmation_message: 'We weren\'t able to retrieve the meeting details. Please try reloading the page'
+        });
       });
 
     } else {
 
-      console.log('Query object not found.');
-      // TODO [Joe, 11-9-2015] : Handle Error Notification and Mixin Scoping
-      // this.transitionTo('/');
+      _this.setState({
+        confirmation_message: 'Sorry! Your URL is broken. Please try clicking on the email link again.'
+      });
     }
   },
 
-  // TODO [Joe, 11-9-2015] : Add dynamic references to number of users and number of meetings
+  // TODO [Joe, 11-9-2015] : ENHANCEMENT : Add dynamic references to number of users and number of meetings
   renderForm: function () {
     return (
       <div>
@@ -118,21 +146,21 @@ module.exports = React.createClass({
 
           <div>
             <p>
-              Thanks for taking the time to give {this.state.data.host} feedback. Your vote has been cast!
+              Thanks for taking the time to give {this.state.data.host} feedback. {this.state.confirmation_message}
             </p>
-            {/* Add a cute Slack-like tool to change the greeting randomly! */}
+            {/* TODO [Joe, 11-17-2015] : ENHANCEMENT : Add a cute Slack-like tool to change the greeting randomly! */}
             <p>
                If you'd like to change your vote, or leave an anonymous comment, feel free to submit the form below. If not, have a unreal day!
             </p>
             {/* TODO [Joe, 11-9-2015] : Add validation in case this data isn't available */}
             <p>
-              Event Title: {this.state.data.title}
+              Event Title: {this.state.data.title ? this.state.data.title : 'Not found'}
             </p>
             <p>
-              Time: {moment(this.state.data.start).calendar()}
+              Time: {moment(this.state.data.start).calendar() ? moment(this.state.data.start).calendar() : 'Not sure.'}
             </p>
             <p>
-              Location: {this.state.data.location}
+              Location: {this.state.data.location ? this.state.data.location : 'Unknown'}
             </p>
           </div>
 
@@ -140,7 +168,7 @@ module.exports = React.createClass({
 
             <div className="question-text">
               <p>
-                {this.state.data.question.question}
+                {this.state.data.question.question ? this.state.data.question.question : 'Question From Email...'}
               </p>
             </div>
 
@@ -180,22 +208,38 @@ module.exports = React.createClass({
   },
 
   renderLoading: function () {
-    // TODO [Tomas, 11-5-2015] : Find a better loading screen
+    // TODO [Tomas, 11-5-2015] : Design a better loading screen
     return (
       <div className="loading">
-        Just give me 7 seconds...
+        Currently retrieving
       </div>
     );
   },
 
+  apiFailure: function () {
+    return (
+      <div className="api-error">
+        {this.state.confirmation_message}
+      </div>
+    );
+  },
 
-  // Instead of wrapping entire render in vote-template, only apply class to survey form, and apply different class to marketing content.
-  // This will ensure that they render at the same time, but one wraps across entire screen.
   render: function() {
+
     if (this.state.loadedData) {
+
+      // All meeting data retrieved
       var mainContent = this.renderForm();
-    } else {
+
+    } else if (!this.state.loadedData) {
+
+      // Still loading
       var mainContent = this.renderLoading();
+
+    } else {
+
+      // API Failure
+      var mainContent = this.renderApiFailure();
     }
     return (
       <div>
