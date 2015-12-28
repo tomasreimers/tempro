@@ -1,9 +1,8 @@
 var $ = require('jquery');
 var testing = require('../tests/testData');
+var config = require('config');
 
-var apiBase = 'http://api.tempro.xyz/v1';
-
-// TODO [Tomas, 11-9-2015]: Automatically create this (path dot method name)
+var apiBase = config.api.base;
 
 module.exports = {
 
